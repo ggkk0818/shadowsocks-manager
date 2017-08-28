@@ -8,6 +8,7 @@ const adminServer = appRequire('plugins/webgui/server/adminServer');
 const adminFlow = appRequire('plugins/webgui/server/adminFlow');
 const adminSetting = appRequire('plugins/webgui/server/adminSetting');
 const adminNotice = appRequire('plugins/webgui/server/adminNotice');
+const adminAccount = appRequire('plugins/webgui/server/adminAccount');
 const push = appRequire('plugins/webgui/server/push');
 const path = require('path');
 const knex = appRequire('init/knex').knex;
@@ -57,6 +58,13 @@ app.put('/api/admin/account/:accountId(\\d+)/port', isAdmin, admin.changeAccount
 app.put('/api/admin/account/:accountId(\\d+)/data', isAdmin, admin.changeAccountData);
 app.delete('/api/admin/account/:accountId(\\d+)', isAdmin, admin.deleteAccount);
 
+app.get('/api/admin/account/mac', isAdmin, adminAccount.getMacAccount);
+app.post('/api/admin/account/mac/:macAddress', isAdmin, adminAccount.addMacAccount);
+app.put('/api/admin/account/mac', isAdmin, adminAccount.editMacAccount);
+app.delete('/api/admin/account/mac', isAdmin, adminAccount.deleteMacAccount);
+
+app.get('/api/user/account/mac/:macAddress', adminAccount.getMacAccountForUser);
+
 app.get('/api/admin/flow/:serverId(\\d+)', isAdmin, adminFlow.getServerFlow);
 app.get('/api/admin/flow/:serverId(\\d+)/lastHour', isAdmin, adminFlow.getServerLastHourFlow);
 app.get('/api/admin/flow/:serverId(\\d+)/user', isAdmin, adminFlow.getServerUserFlow);
@@ -92,9 +100,13 @@ app.delete('/api/admin/notice/:noticeId(\\d+)', isAdmin, adminNotice.deleteNotic
 
 app.get('/api/admin/setting/payment', isAdmin, adminSetting.getPayment);
 app.put('/api/admin/setting/payment', isAdmin, adminSetting.modifyPayment);
+app.get('/api/admin/setting/account', isAdmin, adminSetting.getAccount);
+app.put('/api/admin/setting/account', isAdmin, adminSetting.modifyAccount);
+app.get('/api/admin/setting/base', isAdmin, adminSetting.getBase);
+app.put('/api/admin/setting/base', isAdmin, adminSetting.modifyBase);
+app.get('/api/admin/setting/mail', isAdmin, adminSetting.getMail);
+app.put('/api/admin/setting/mail', isAdmin, adminSetting.modifyMail);
 
-app.get('/api/admin/setting', isAdmin, adminSetting.getSetting);
-app.put('/api/admin/setting', isAdmin, adminSetting.modifySetting);
 
 app.get('/api/user/notice', isUser, user.getNotice);
 app.get('/api/user/account', isUser, user.getAccount);
@@ -121,21 +133,32 @@ if(config.plugins.webgui.gcmAPIKey && config.plugins.webgui.gcmSenderId) {
   app.post('/api/push/client', push.client);
 }
 
-app.get('/serviceworker.js', (req, res) => {
-  res.header('Content-Type', 'text/javascript');
-  res.sendFile('serviceworker.js', {
-    root: path.resolve(__dirname, '../public/'),
-  }, err => {
-    if (err) {
-      console.log(err);
-      return res.status(404).end();
-    }
-  });
-});
+// app.get('/serviceworker.js', (req, res) => {
+//   res.header('Content-Type', 'text/javascript');
+//   res.sendFile('serviceworker.js', {
+//     root: path.resolve(__dirname, '../public/'),
+//   }, err => {
+//     if (err) {
+//       console.log(err);
+//       return res.status(404).end();
+//     }
+//   });
+// });
 
 const manifest = appRequire('plugins/webgui/views/manifest').manifest;
 app.get('/manifest.json', (req, res) => {
-  return res.json(manifest);
+  return knex('webguiSetting').select().where({
+    key: 'base',
+  }).then(success => {
+    if(!success.length) {
+      return Promise.reject('settings not found');
+    }
+    success[0].value = JSON.parse(success[0].value);
+    return success[0].value;
+  }).then(success => {
+    manifest.name = success.title;
+    return res.json(manifest);
+  });
 });
 
 const version = appRequire('package').version;
@@ -144,17 +167,77 @@ const configForFrontend = {
   alipay: config.plugins.alipay && config.plugins.alipay.use,
   paypal: config.plugins.paypal && config.plugins.paypal.use,
   paypalMode: config.plugins.paypal && config.plugins.paypal.mode,
+  macAccount: config.plugins.macAccount && config.plugins.macAccount.use,
 };
+
 const cdn = config.plugins.webgui.cdn;
-const homePage = (req, res) => res.render('index', {
-  version,
-  cdn,
-  config: configForFrontend,
-});
+const colors = [
+  { value: 'red', color: '#F44336' },
+  { value: 'pink', color: '#E91E63' },
+  { value: 'purple', color: '#9C27B0' },
+  { value: 'deep-purple', color: '#673AB7' },
+  { value: 'indigo', color: '#3F51B5' },
+  { value: 'blue', color: '#2196F3' },
+  { value: 'light-blue', color: '#03A9F4' },
+  { value: 'cyan', color: '#00BCD4' },
+  { value: 'teal', color: '#009688' },
+  { value: 'green', color: '#4CAF50' },
+  { value: 'light-green', color: '#8BC34A' },
+  { value: 'lime', color: '#CDDC39' },
+  { value: 'yellow', color: '#FFEB3B' },
+  { value: 'amber', color: '#FFC107' },
+  { value: 'orange', color: '#FF9800' },
+  { value: 'deep-orange', color: '#FF5722' },
+  { value: 'brown', color: '#795548' },
+  { value: 'blue-grey', color: '#607D8B' },
+  { value: 'grey', color: '#9E9E9E' },
+];
+const homePage = (req, res) => {
+  return knex('webguiSetting').select().where({
+    key: 'base',
+  }).then(success => {
+    if(!success.length) {
+      return Promise.reject('settings not found');
+    }
+    success[0].value = JSON.parse(success[0].value);
+    return success[0].value;
+  }).then(success => {
+    configForFrontend.title = success.title;
+    configForFrontend.themePrimary = success.themePrimary;
+    configForFrontend.themeAccent = success.themeAccent;
+    const filterColor = colors.filter(f => f.value === success.themePrimary);
+    configForFrontend.browserColor = filterColor[0] ? filterColor[0].color : '#3F51B5';
+    return res.render('index', {
+      title: success.title,
+      version,
+      cdn,
+      config: configForFrontend,
+    });
+  });
+};
 app.get('/', homePage);
 app.get(/^\/home\//, homePage);
 app.get(/^\/admin\//, homePage);
 app.get(/^\/user\//, homePage);
+
+app.get('/serviceworker.js', (req, res) => {
+  return knex('webguiSetting').select().where({
+    key: 'base',
+  }).then(success => {
+    if(!success.length) {
+      return Promise.reject('settings not found');
+    }
+    success[0].value = JSON.parse(success[0].value);
+    return success[0].value;
+  }).then(success => {
+    res.header('Content-Type', 'text/javascript');
+    res.render('serviceworker.js', {
+      serviceWorker: !!success.serviceWorker,
+      serviceWorkerTime: success.serviceWorkerTime,
+    });
+  });
+  
+});
 
 // wss.on('connection', function connection(ws) {
 //   // console.log(ws);

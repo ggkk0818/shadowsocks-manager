@@ -5,17 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Shadowsocks-Manager">
+    <meta name="apple-mobile-web-app-title" content="<%= title%>">
     <link rel="apple-touch-startup-image" href="<%= cdn%>/libs/favicon.png">
     <link rel="apple-touch-icon" href="<%= cdn%>/libs/favicon.png">
     <meta name="msapplication-TileImage" content="<%= cdn%>/libs/favicon.png">
-    <meta name="msapplication-TileColor" content="#3F51B5">
-    <meta name="theme-color" content="#3F51B5">
+    <meta name="msapplication-TileColor" content="<%= config.browserColor%>">
+    <meta name="theme-color" content="<%= config.browserColor%>">
     <link rel="stylesheet" href="<%= cdn%>/libs/style.css">
     <link rel="stylesheet" href="<%= cdn%>/libs/angular-material.min.css">
     <link rel="shortcut icon" href="<%= cdn%>/libs/favicon.png">
     <link rel="manifest" href="/manifest.json">
-    <title>Shadowsocks-Manager</title>
+    <title><%= title%></title>
     <base href="/">
 </head>
 
@@ -27,6 +27,7 @@
     <script src="<%= cdn%>/libs/angular-messages.min.js"></script>
     <script src="<%= cdn%>/libs/angular-material.min.js"></script>
     <script src="<%= cdn%>/libs/angular-ui-router.min.js"></script>
+    <script src="<%= cdn%>/libs/angular-translate.min.js"></script>
     <script src="<%= cdn%>/libs/qrcode.min.js"></script>
     <script src="<%= cdn%>/libs/angular-qr.min.js"></script>
     <script src="<%= cdn%>/libs/ngStorage.min.js"></script>
@@ -37,6 +38,7 @@
     <script src="<%= cdn%>/libs/angular-websocket.min.js"></script>
     <script src="<%= cdn%>/libs/marked.min.js"></script>
     <script src="<%= cdn%>/libs/angular-marked.min.js"></script>
+    <script src="<%= cdn%>/libs/angular-translate.min.js"></script>
     <script src="https://www.paypalobjects.com/api/checkout.js"></script> 
     <script>
         window.ssmgrVersion = '<%= version%>'

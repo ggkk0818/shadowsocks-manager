@@ -107,6 +107,7 @@ const editAccount = async (id, options) => {
     update.port = +options.port;
   }
   await knex('account_plugin').update(update).where({ id });
+  await checkAccount.checkServer();
   return;
 };
 
@@ -242,7 +243,7 @@ const setAccountLimit = async (userId, accountId, orderType) => {
   if(!accountId) {
     const getNewPort = () => {
       return knex('webguiSetting').select().where({
-        key: 'system',
+        key: 'account',
       }).then(success => {
         if(!success.length) { return Promise.reject('settings not found'); }
         success[0].value = JSON.parse(success[0].value);
@@ -323,11 +324,14 @@ const setAccountLimit = async (userId, accountId, orderType) => {
     accountData.limit += 1;
     accountData.create -= countTime;
   }
+  let port = await getAccount({ id: accountId }).then(success => success[0].port);
   await knex('account_plugin').update({
     type: orderType >= 6 ? 3 : orderType,
     data: JSON.stringify(accountData),
     autoRemove: 0,
   }).where({ id: accountId });
+  checkAccount.deleteCheckAccountTimePort(port);
+  await checkAccount.checkServer();
   return;
 };
 

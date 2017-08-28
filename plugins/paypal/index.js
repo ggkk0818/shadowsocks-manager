@@ -18,6 +18,22 @@ if(config.plugins.paypal && config.plugins.paypal.use) {
 
 const createOrder = async (user, account, amount, type) => {
   try {
+    const orderSetting = await knex('webguiSetting').select().where({
+      key: 'payment',
+    }).then(success => {
+      if(!success.length) {
+        return Promise.reject('settings not found');
+      }
+      success[0].value = JSON.parse(success[0].value);
+      return success[0].value;
+    }).then(success => {
+      if(type === 5) { return success.hour; }
+      else if(type === 4) { return success.day; }
+      else if(type === 2) { return success.week; }
+      else if(type === 3) { return success.month; }
+      else if(type === 6) { return success.season; }
+      else if(type === 7) { return success.year; }    
+    });
     const create_payment_json = {
       intent: 'sale',
       payer: {
@@ -32,7 +48,7 @@ const createOrder = async (user, account, amount, type) => {
           currency: 'USD',
           total: amount,
         },
-        description: 'ss'
+        description: orderSetting.orderName || 'ss'
       }]
     };
     const payment = await new Promise((resolve, reject) => {
@@ -111,6 +127,29 @@ const checkOrder = async paypalId => {
   return;
 };
 
+const sendSuccessMail = async userId => {
+  const emailPlugin = appRequire('plugins/email/index');
+  const user = await knex('user').select().where({
+    type: 'normal',
+    id: userId,
+  }).then(success => {
+    if(success.length) {
+      return success[0];
+    }
+    return Promise.reject('user not found');
+  });
+  const orderMail = await knex('webguiSetting').select().where({
+    key: 'mail',
+  }).then(success => {
+    if(!success.length) {
+      return Promise.reject('settings not found');
+    }
+    success[0].value = JSON.parse(success[0].value);
+    return success[0].value.order;
+  });
+  await emailPlugin.sendMail(user.email, orderMail.title, orderMail.content);
+};
+
 cron.minute(async () => {
   if(!config.plugins.paypal || !config.plugins.paypal.use) { return; }
   const orders = await knex('paypal').select().whereNotBetween('expireTime', [0, Date.now()]);
@@ -133,6 +172,7 @@ cron.minute(async () => {
         });
       }).then(() => {
         logger.info(`订单支付成功: [${ order.orderId }][${ order.amount }][account: ${ accountId }]`);
+        sendSuccessMail(userId);
       }).catch(err => {
         logger.error(`订单支付失败: [${ order.orderId }]`, err);
       });
