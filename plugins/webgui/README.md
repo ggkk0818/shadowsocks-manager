@@ -13,7 +13,6 @@ This plugin provide a webgui to control shadowsocks.
 
     ```
     type: m
-    empty: false
 
     manager:
       address: 127.0.0.1:6002
@@ -26,6 +25,8 @@ This plugin provide a webgui to control shadowsocks.
         use: true
       account:
         use: true
+      macAccount:
+        use: true
       email:
         use: true
         username: 'username'
@@ -37,6 +38,7 @@ This plugin provide a webgui to control shadowsocks.
         port: '80'
         site: 'http://yourwebsite.com'
         # cdn: 'http://xxx.xxx.com'
+        # googleAnalytics: 'UA-xxxxxxxx-x'
         gcmSenderId: '456102641793'
         gcmAPIKey: 'AAAAGzzdqrE:XXXXXXXXXXXXXX'
       alipay:

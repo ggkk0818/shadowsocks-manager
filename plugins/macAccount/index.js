@@ -2,14 +2,45 @@ const knex = appRequire('init/knex').knex;
 const serverPlugin = appRequire('plugins/flowSaver/server');
 const accountPlugin = appRequire('plugins/account/index');
 const dns = require('dns');
+const net = require('net');
+
+const loginLog = {};
+const scanLoginLog = ip => {
+  for(let i in loginLog) {
+    if(Date.now() - loginLog[i].time >= 10 * 60 * 1000) {
+      delete loginLog[i];
+    }
+  }
+  if(!loginLog[ip]) {
+    return false;
+  } else if (loginLog[ip].number <= 5) {
+    return false;
+  } else {
+    return true;
+  }
+};
+const loginFail = ip => {
+  if(!loginLog[ip]) {
+    loginLog[ip] = { number: 1, time: Date.now() };
+  } else {
+    loginLog[ip] = { number: loginLog[ip].number + 1, time: Date.now() };
+  }
+};
 
 const getIp = address => {
+  let myAddress = address;
+  if(address.indexOf(':') >= 0) {
+    myAddress = address.split(':')[1];
+  }
+  if(net.isIP(myAddress)) {
+    return Promise.resolve(myAddress);
+  }
   return new Promise((resolve, reject) => {
-    dns.lookup(address, (err, address, family) => {
+    dns.lookup(myAddress, (err, myAddress, family) => {
       if(err) {
         return reject(err);
       }
-      return resolve(address);
+      return resolve(myAddress);
     });
   });
 };
@@ -27,10 +58,17 @@ const getAccount = async userId => {
   return accounts;
 };
 
-const getAccountForUser = async (mac, serverId, accountId) => {
+const getAccountForUser = async (mac, ip) => {
+  if(scanLoginLog(ip)) {
+    return Promise.reject('ip is in black list');
+  }
   const macAccount = await knex('mac_account').where({ mac }).then(success => success[0]);
-  const myServerId = serverId || macAccount.serverId;
-  const myAccountId = accountId || macAccount.accountId;
+  if(!macAccount) {
+    loginFail(ip);
+    return Promise.reject('mac account not found');
+  }
+  const myServerId = macAccount.serverId;
+  const myAccountId = macAccount.accountId;
   const accounts = await knex('mac_account').select([
     'mac_account.id',
     'mac_account.mac',
@@ -43,7 +81,7 @@ const getAccountForUser = async (mac, serverId, accountId) => {
   const account = accounts.filter(a => {
     return a.accountId === myAccountId;
   })[0];
-  const servers = await serverPlugin.list();
+  const servers = await serverPlugin.list({ status: false });
   const server = servers.filter(s => {
     return s.id === myServerId;
   })[0];
@@ -60,12 +98,15 @@ const getAccountForUser = async (mac, serverId, accountId) => {
       return {
         name: f.name,
         address: success,
+        port: account.port + f.shift,
+        method: f.method,
       };
     });
   });
   const serverReturn = await Promise.all(serverList);
-  return {
+  const data = {
     default: {
+      name: server.name,
       address,
       port: account.port,
       password: account.password,
@@ -73,6 +114,11 @@ const getAccountForUser = async (mac, serverId, accountId) => {
     },
     servers: serverReturn,
   };
+  if(!serverReturn.filter(f => f.name === server.name)[0]) {
+    data.default.name = serverReturn[0].name;
+    data.default.address = serverReturn[0].address;
+  }
+  return data;
 };
 
 const editAccount = (id, mac, serverId, accountId) => {
@@ -85,8 +131,22 @@ const deleteAccount = id => {
   return knex('mac_account').delete().where({ id });
 };
 
+const login = async (mac, ip) => {
+  if(scanLoginLog(ip)) {
+    return Promise.reject('ip is in black list');
+  }
+  const account = await knex('mac_account').where({ mac }).then(success => success[0]);
+  if(!account) {
+    loginFail(ip);
+    return Promise.reject('mac account not found');
+  } else {
+    return account;
+  }
+};
+
 exports.editAccount = editAccount;
 exports.newAccount = newAccount;
 exports.getAccount = getAccount;
 exports.deleteAccount = deleteAccount;
 exports.getAccountForUser = getAccountForUser;
+exports.login = login;

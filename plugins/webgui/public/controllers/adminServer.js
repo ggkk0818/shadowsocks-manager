@@ -153,7 +153,7 @@ app.controller('AdminServerController', ['$scope', '$http', '$state', 'moment', 
       // $state.go('admin.server');
     });
     $scope.toAccountPage = port => {
-      adminApi.getAccountId(port).then(id => {
+      adminApi.getAccountId(port - $scope.server.shift).then(id => {
         $state.go('admin.accountPage', { accountId: id });
       });
     };
@@ -334,7 +334,10 @@ app.controller('AdminServerController', ['$scope', '$http', '$state', 'moment', 
     $scope.setMethod = () => {
       $scope.server.method = $scope.methodSearch;
     };
-    $scope.server = {};
+    $scope.server = {
+      scale: 1,
+      shift: 0,
+    };
     $scope.confirm = () => {
       alertDialog.loading();
       $http.post('/api/admin/server', {
@@ -343,6 +346,9 @@ app.controller('AdminServerController', ['$scope', '$http', '$state', 'moment', 
         port: +$scope.server.port,
         password: $scope.server.password,
         method: $scope.server.method,
+        comment: $scope.server.comment,
+        scale: $scope.server.scale,
+        shift: $scope.server.shift,
       }, {
         timeout: 15000,
       }).then(success => {
@@ -391,22 +397,26 @@ app.controller('AdminServerController', ['$scope', '$http', '$state', 'moment', 
     .then(success => {
       $scope.server = {
         name: success.data.name,
+        comment: success.data.comment,
         address: success.data.host,
         port: +success.data.port,
         password: success.data.password,
         method: success.data.method,
         scale: success.data.scale,
+        shift: success.data.shift,
       };
     });
     $scope.confirm = () => {
       alertDialog.loading();
       $http.put('/api/admin/server/' + $stateParams.serverId, {
         name: $scope.server.name,
+        comment: $scope.server.comment,
         address: $scope.server.address,
         port: +$scope.server.port,
         password: $scope.server.password,
         method: $scope.server.method,
         scale: $scope.server.scale,
+        shift: $scope.server.shift,
       }).then(success => {
         alertDialog.show('修改服务器成功', '确定');
         $state.go('admin.serverPage', { serverId: $stateParams.serverId });
